@@ -1,0 +1,88 @@
+cabal-version:      2.4
+name:               carnage
+version:            0.1.0.0
+synopsis:           DBREE webhook poster
+-- description:
+homepage:
+-- bug-reports:
+license:            MIT
+license-file:       LICENSE
+author:             slice
+maintainer:         tinyslices@gmail.com
+-- copyright:
+category:           Web
+extra-source-files: CHANGELOG.md
+
+common common-stanza
+    ghc-options: -Wall -Wincomplete-uni-patterns -Wincomplete-record-updates -Wredundant-constraints -fplugin=Polysemy.Plugin
+    default-extensions: DataKinds
+                      , FlexibleContexts
+                      , GADTs
+                      , PolyKinds
+                      , RankNTypes
+                      , ScopedTypeVariables
+                      , TypeApplications
+                      , TypeOperators
+                      , TypeFamilies
+                      , OverloadedStrings
+                      , LambdaCase
+                      , NamedFieldPuns
+                      , GeneralizedNewtypeDeriving
+                      , TemplateHaskell
+    build-depends:    base ^>=4.14.3.0
+                    , relude ^>=1.0.0.0
+                    , polysemy ^>=1.7.1.0
+                    , polysemy-plugin ^>=0.4.3.0
+                    , bytestring
+                    , wreq
+                    , http-types
+                    , tagsoup
+                    , lens
+                    , lens-aeson
+                    , http-client
+                    , time
+                    , text
+                    , aeson
+                    , unordered-containers
+                    , directory
+    mixins: base hiding (Prelude)
+           , relude (Relude as Prelude)
+           , relude
+    default-language: Haskell2010
+
+library carnage-internal
+    import: common-stanza
+    exposed-modules:
+        Carnage.Internal
+        Carnage.Internal.Squeeze
+    build-depends: base
+    hs-source-dirs: Carnage
+
+library
+    import: common-stanza
+    hs-source-dirs:   Carnage
+    exposed-modules:
+        Carnage
+        Carnage.Models
+        Carnage.Embeds
+        Carnage.Root
+        Carnage.Search
+        Carnage.Discovery
+    build-depends:
+        carnage-internal
+
+test-suite test-carnage
+    import: common-stanza
+    type: exitcode-stdio-1.0
+    main-is: Spec.hs
+    hs-source-dirs: test
+    build-depends: hspec ^>=2.9.3
+                 , QuickCheck ^>=2.14.2
+                 , carnage
+                 , carnage-internal
+
+executable carnage
+    import: common-stanza
+    main-is:          Main.hs
+    hs-source-dirs:   app
+    build-depends: carnage
