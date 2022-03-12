@@ -50,25 +50,23 @@ discoverNewFiles ::
 discoverNewFiles alreadySeen query = go (SearchOffset 0) []
   where
     go :: Member DbreeSearch r => SearchOffset -> [DbreeSearchResult] -> Sem r [DbreeSearchResult]
-    go searchOffset seenSoFar = do
-      files <- searchDbree query searchOffset
-      let fetchedIDs = HS.map uploadID (HS.fromList files)
-          newIDs = HS.difference fetchedIDs alreadySeen
-          SearchOffset searchOffset' = searchOffset
+    go (SearchOffset offset) seenSoFar = do
+      files <- searchDbree query (SearchOffset offset)
+
+      let fetchedIDs = HS.map uploadID $ HS.fromList files
+          familiarIDs = HS.intersection fetchedIDs alreadySeen
 
       -- if none of the files we've just fetched are familiar, fetch more (at most, 10 times)
-      if HS.size newIDs == dbreePageSize && searchOffset' < (dbreePageSize * 9)
-        then
-          let newSearchOffset = SearchOffset (searchOffset' + dbreePageSize)
-           in go newSearchOffset (seenSoFar ++ files)
+      if HS.null familiarIDs && offset < (dbreePageSize * 9)
+        then go (SearchOffset $ offset + dbreePageSize) (seenSoFar ++ files)
         else -- otherwise, return all the new files
           pure $ seenSoFar ++ filter (not . (`HS.member` alreadySeen) . uploadID) files
 
--- | Discover all new files from a list of queries, saving the set
--- of all newly seen files to a file path.
+-- | Discover all new files from a list of queries, saving the set of all newly
+-- seen files to a store.
 --
--- A list of queries is supported due to the common use case of wanting to make
--- multiple queries at a time, and the problems that may arise from handling
+-- The modus operandi of this function is to handle the common use case of making
+-- multiple queries gracefully. There are problems that may arise from handling
 -- "already seen" files naively. Should a query surface enough new files that
 -- themselves appear in a later query (due to both queries matching), then it's
 -- possible that the latter query will miss new files if there were enough
@@ -81,11 +79,12 @@ discoverNewFiles alreadySeen query = go (SearchOffset 0) []
 -- the former query would be marked as seen and would possibly present the
 -- illusion of there being no new files at all, should they be obscured by a
 -- full page of seen files. Therefore, this function passes the same set of
--- seen file IDs when making queries and takes care to deduplicate them in the
--- result.
+-- seen file IDs when making queries and takes care to deduplicate them
+-- afterwards.
 processQueries ::
   Member DbreeSearch r =>
   Member SeenIDStore r =>
+  -- | The search queries to make.
   [Text] ->
   Sem r (HashMap Text [DbreeSearchResult])
 processQueries queries = do
@@ -94,15 +93,13 @@ processQueries queries = do
   writeSeenIDs $ HS.union (HS.fromList $ uploadID <$> join queryResults) alreadySeenIDs
   pure $ HM.fromList . zip queries . dedupPreceding $ queryResults
   where
-    -- we need to deduplicate the results from each query, but in such a way
-    -- that only files from previous queries are considered to be seen
+    -- We need to deduplicate the results from each query, but in such a way
+    -- that only files from previous queries are considered to be seen.
     dedupPreceding :: [[DbreeSearchResult]] -> [[DbreeSearchResult]]
     dedupPreceding = go HS.empty
       where
-        go :: HashSet DbreeSearchResult -> [[DbreeSearchResult]] -> [[DbreeSearchResult]]
-        go seenSearchResults (results : moreResults) = filteredSearchResults : rest
+        go seen (results : tl) = filteredSearchResults : go newSeen tl
           where
-            filteredSearchResults = filter (not . (`HS.member` seenSearchResults)) results
-            newSeen = HS.union seenSearchResults (HS.fromList results)
-            rest = go newSeen moreResults
+            filteredSearchResults = filter (not . (`HS.member` seen)) results
+            newSeen = HS.union seen (HS.fromList results)
         go _ [] = []
