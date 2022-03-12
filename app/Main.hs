@@ -77,9 +77,9 @@ postToWebhook discordWebhookUrl query results = bodyIO >>= void . W.post (toStri
           ( \sr@DbreeSearchResult {fileName, fileSize} ->
               "\8226 "
                 <> markdownLinkWithoutEmbed fileName (searchResultUrl sr)
-                <> " ("
+                <> " (`"
                 <> fileSize
-                <> ")"
+                <> "`)"
           )
 
     truncateTo :: Int -> Text -> Text
