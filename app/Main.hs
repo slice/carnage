@@ -32,7 +32,8 @@ runDbreeSearchWreq ::
   Sem (DbreeSearch ': r) a ->
   Sem r a
 runDbreeSearchWreq options = interpret $ \case
-  SearchDbree query searchOffset -> embed (search options query searchOffset)
+  SearchDbree query searchOffset@(SearchOffset offset) ->
+    embed $ putStrLn ("searching for " <> show query <> " (offset=" <> show offset <> ") ...") >> search options query searchOffset
 
 data Config = Config
   { ddg1Cookie :: Text,
