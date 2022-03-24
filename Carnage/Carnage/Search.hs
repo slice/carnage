@@ -1,4 +1,4 @@
-module Carnage.Search (search) where
+module Carnage.Search (parseSearchResults, search) where
 
 import Carnage.Models (DbreeID (..), DbreeSearchResult (..), SearchOffset (..))
 import Carnage.Root (dbreeRootURL)
